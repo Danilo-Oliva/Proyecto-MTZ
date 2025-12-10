@@ -1,8 +1,13 @@
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget
+from database import Database
 
 def main():
-  #1 - creo la instancia de la app
+  #0 - inicio la base de datos
+  db = Database()
+  db.crear_tablas()
+  
+  #1 -creo la instancia de la app
   app = QApplication(sys.argv)
   
   #2 - creo la ventana principal
@@ -14,8 +19,8 @@ def main():
   central_widget = QWidget()
   layout = QVBoxLayout()
   
-  texto = QLabel("El sistema está funcionando correctamente")
-  texto.setStyleSheet("font-size: 20px; color: blue; font-weight: bold;")
+  texto = QLabel("Base de Datos conectada. Sistema listo")
+  texto.setStyleSheet("font-size: 20px; color: green; font-weight: bold;")
   
   layout.addWidget(texto)
   central_widget.setLayout(layout)
