@@ -1,45 +1,68 @@
 import sqlite3
 import os
 
+
 class Database:
-  def __init__(self, db_name="gym_mtz.db"):
-    #por las dudas aseguro que la db se cree en la carpeta correcta
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    self.db_path = os.path.join(base_dir, db_name)
-    
-  def conectar(self):
-    """Establece conexión con la base de datos"""
-    try:
-      conn = sqlite3.connect(self.db_path)
-      return conn
-    except sqlite3.Error as e:
-      print(f"Error conectando a la BD: {e}")
-      return None
-  
-  def crear_tablas(self):
-    """Crea las tablas necesarios si no existen"""
-    conn = self.conectar()
-    if conn:
-      cursor = conn.cursor()
-      
-      #tabla de socios
-      cursor.execute('''
-          CREATE TABLE IF NOT EXISTS miembros (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              nombre TEXT NOT NULL,
-              apellido TEXT NOT NULL,
-              dni TEXT UNIQUE NOT NULL,
-              telefono TEXT,
-              fecha_registro DATE DEFAULT CURRENT_DATE,
-              activo BOOLEAN DEFAULT 1
+    def __init__(self, db_name="gym_mtz.db"):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.db_path = os.path.join(base_dir, db_name)
+
+    def conectar(self):
+        try:
+            conn = sqlite3.connect(self.db_path)
+            return conn
+        except sqlite3.Error as e:
+            print(f"Error conectando a la BD: {e}")
+            return None
+
+    def crear_tablas(self):
+        conn = self.conectar()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS miembros (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL,
+                    apellido TEXT NOT NULL,
+                    dni TEXT UNIQUE NOT NULL,
+                    telefono TEXT,
+                    actividad TEXT,               -- Ej: "Musculación", "Boxeo"
+                    ingresos_restantes INTEGER DEFAULT 0, -- Para controlar el acceso
+                    ultimo_pago DATE,             -- Fecha del pago
+                    fecha_registro DATE DEFAULT CURRENT_DATE,
+                    activo BOOLEAN DEFAULT 1
                 )
-      ''')
-      
-      #agrego más tablas para el futuro, como planes, pagos
-      conn.commit()
-      conn.close()
-      print("Base de datos y tablas verificadas con éxito")
+            """
+            )
+
+            conn.commit()
+            conn.close()
+            print("Base de datos actualizada creada con éxito.")
+
+    # Función nueva para simular un socio y probar el sistema
+    def insertar_socio_prueba(self):
+        conn = self.conectar()
+        if conn:
+            cursor = conn.cursor()
+            try:
+                # Insertamos un usuario falso para probar
+                cursor.execute(
+                    """
+                    INSERT INTO miembros (nombre, apellido, dni, actividad, ingresos_restantes, ultimo_pago)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                    ("Juan", "Pérez", "12345678", "Musculación", 12, "2023-12-01"),
+                )
+                conn.commit()
+                print("Socio de prueba creado (DNI: C)")
+            except sqlite3.IntegrityError:
+                print("El socio de prueba ya existe.")
+            finally:
+                conn.close()
+
 
 if __name__ == "__main__":
-  db = Database()
-  db.crear_tablas()
+    db = Database()
+    db.crear_tablas()
+    db.insertar_socio_prueba()
