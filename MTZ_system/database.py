@@ -39,7 +39,19 @@ class Database:
             conn.commit()
             conn.close()
             print("Base de datos actualizada creada con éxito.")
-
+    def descontar_ingresos(self, dni):
+        '''restamos 1 a los ingresos del socio'''
+        conn = self.conectar()
+        if conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE miembros SET ingresos_restantes = ingresos_restantes - 1 WHERE dni = ?", (dni,))
+                conn.commit()
+            except sqlite3.Error as e:
+                print(f"Error al descontar ingreso: {e}")
+            finally:
+                conn.close()
+            
     # Función nueva para simular un socio y probar el sistema
     def insertar_socio_prueba(self):
         conn = self.conectar()

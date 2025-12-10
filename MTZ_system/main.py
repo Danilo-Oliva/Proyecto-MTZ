@@ -117,21 +117,35 @@ class VentanaPrincipal(QMainWindow):
             return
         
         conn = self.db.conectar()
+        resultado = None
+        
+        #fase 1 - Lectura
         if conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT nombre, apellido, actividad, ingresos_restantes, ultimo_pago FROM miembros WHERE dni = ?", (dni,))
-            resultado = cursor.fetchone()
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT nombre, apellido, actividad, ingresos_restantes, ultimo_pago FROM miembros WHERE dni = ?", (dni,))
+                resultado = cursor.fetchone()
+            except Exception as e:
+                print(f"Error de lectura: {e}")
+            finally:
+                conn.close()
             
+            #fase 2: Procesamiento
             if resultado:
                 nombre, apellido, actividad, ingresos, ultimo_pago = resultado
                 
                 #preparo la pantalla 2 con los datos
-                self.lbl_saludo.setText(f"Bienvenido {nombre}!")
+                self.lbl_saludo.setText(f"Bienvenido {nombre} {apellido} !")
                 self.lbl_detalles.setText(f"Actividad: {actividad}\núltimo pago: {ultimo_pago}")
                 
                 if ingresos > 0:
-                    self.lbl_acceso.setText(f"PASE HABILITADO\nTe quedan {ingresos} restantes")
+                    #descontamos 1 ingreso
+                    self.db.descontar_ingresos(dni)
+                    
+                    #actualizamos el texto para mostrar cuantas le quedan
+                    ingresos_actualizados = ingresos - 1
+                    
+                    self.lbl_acceso.setText(f"PASE HABILITADO\nTe quedan {ingresos_actualizados} restantes")
                     self.lbl_acceso.setStyleSheet("font-size: 32px; color: #44ff44; font-weight: bold; border: 2px solid #44ff44; padding: 20px; border-radius: 10px;")
                 else:
                     self.lbl_acceso.setText(f"ACCESO DENEGADO\Sin ingresos disponibles")
