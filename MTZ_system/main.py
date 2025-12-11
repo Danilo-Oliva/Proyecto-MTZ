@@ -1,18 +1,70 @@
 import sys
 from PyQt6.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QLabel,
-    QVBoxLayout,
-    QWidget,
-    QLineEdit,
-    QPushButton,
-    QStackedWidget,
+    QApplication, QMainWindow, QLabel, QVBoxLayout,
+    QWidget, QLineEdit, QPushButton, QStackedWidget,
+    QDialog, QFormLayout, QSpinBox, QComboBox, QMessageBox
 )
 from PyQt6.QtCore import QTimer, Qt
 from database import Database
 
-
+class VentanaRegistro(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Nuevo Socio - MTZ")
+        self.setFixedSize(400, 300)
+        self.db = Database()
+        
+        layout = QFormLayout()
+        
+        self.input_nombre = QLineEdit()
+        self.input_apellido = QLineEdit()
+        self.input_dni = QLineEdit()
+        self.input_dni.setPlaceholderText("Solo números")
+        
+        #elegir actividades
+        self.combo_actividad = QComboBox()
+        self.combo_actividad.addItems(["Musculación", "Boxeo"])
+        
+        #spinbox para los ingresos
+        self.spin_ingresos = QSpinBox()
+        self.spin_ingresos.setRange(1, 30)
+        self.spin_ingresos.setValue(12)
+        
+        #boton guardar
+        self.btn_guardar = QPushButton("Registrar Socio")
+        self.btn_guardar.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-weight: bold;")
+        self.btn_guardar.clicked.connect(self.guardar_socio)
+        
+        #filas para el formulario
+        layout.addRow("Nombre: ", self.input_nombre)
+        layout.addRow("Apellido:", self.input_apellido)
+        layout.addRow("DNI:", self.input_dni)
+        layout.addRow("Actividad:", self.combo_actividad)
+        layout.addRow("Pases Iniciales:", self.spin_ingresos)
+        layout.addRow(self.btn_guardar)
+        
+        self.setLayout(layout)
+        
+    def guardar_socio(self):
+        nombre = self.input_nombre.text().strip()
+        apellido = self.input_apellido.text().strip()
+        dni = self.input_dni.text().strip()
+        actividad = self.combo_actividad.currentText()
+        ingresos = self.spin_ingresos.value()
+        
+        if not nombre or not apellido or not dni:
+            QMessageBox.warning(self, "Error", "Por favor complete todos los campos.")
+            return
+        
+        #llamamos a la database
+        exito = self.db.registrar_socio(nombre, apellido, dni, actividad, ingresos)
+        
+        if exito:
+            QMessageBox.information(self, "Éxito", f"Socio {nombre} {apellido} registrado correctamente.")
+            self.accept()
+        else:
+            QMessageBox.critical(self, "Error", "No se pudo registrar. ¿Quizás el DNI ya existe?")
+        
 class VentanaPrincipal(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -85,9 +137,17 @@ class VentanaPrincipal(QMainWindow):
         )
         self.lbl_error.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_error)
+        
+        #botón ADMIN
+        btn_admin = QPushButton("ADMINISTRACIÓN")
+        btn_admin.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_admin.setStyleSheet("background-color: #444; color: #aaa; border: none; font-size: 12px; margin-top: 50px;")
+        btn_admin.clicked.connect(self.abrir_admin)
+        layout.addWidget(btn_admin)
 
         widget.setLayout(layout)
         return widget
+    
     def crear_pantalla_resultado(self):
         '''Diseño de la pantalla que muestra la info del socio'''
         widget = QWidget()
@@ -135,12 +195,12 @@ class VentanaPrincipal(QMainWindow):
                 nombre, apellido, actividad, ingresos, ultimo_pago = resultado
                 
                 #preparo la pantalla 2 con los datos
-                self.lbl_saludo.setText(f"Bienvenido {nombre} {apellido} !")
+                self.lbl_saludo.setText(f"Bienvenido {nombre} {apellido}!")
                 self.lbl_detalles.setText(f"Actividad: {actividad}\núltimo pago: {ultimo_pago}")
                 
                 if ingresos > 0:
                     #descontamos 1 ingreso
-                    self.db.descontar_ingresos(dni)
+                    self.db.descontar_ingreso(dni)
                     
                     #actualizamos el texto para mostrar cuantas le quedan
                     ingresos_actualizados = ingresos - 1
@@ -148,7 +208,7 @@ class VentanaPrincipal(QMainWindow):
                     self.lbl_acceso.setText(f"PASE HABILITADO\nTe quedan {ingresos_actualizados} restantes")
                     self.lbl_acceso.setStyleSheet("font-size: 32px; color: #44ff44; font-weight: bold; border: 2px solid #44ff44; padding: 20px; border-radius: 10px;")
                 else:
-                    self.lbl_acceso.setText(f"ACCESO DENEGADO\Sin ingresos disponibles")
+                    self.lbl_acceso.setText(f"ACCESO DENEGADO\nSin ingresos disponibles")
                     self.lbl_acceso.setStyleSheet("font-size: 32px; color: #ff4444; font-weight: bold; border: 2px solid #ff4444; padding: 20px; border-radius: 10px;")
                     
                 # cambiamos de ventana a la de mostrar resultado
@@ -160,6 +220,9 @@ class VentanaPrincipal(QMainWindow):
             else:
                 self.lbl_error.setText("DNI no encontrado")
                 self.input_dni.selectAll()#selecciona el texto para que se pueda escribir arriba
+    def abrir_admin(self):
+        dialogo = VentanaRegistro()
+        dialogo.exec()
     def volver_al_inicio(self):
         '''esta funcion se ejecuta solo cuadno el cronometro llega a 0'''
         self.timer.stop()

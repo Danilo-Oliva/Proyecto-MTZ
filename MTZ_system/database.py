@@ -39,7 +39,7 @@ class Database:
             conn.commit()
             conn.close()
             print("Base de datos actualizada creada con éxito.")
-    def descontar_ingresos(self, dni):
+    def descontar_ingreso(self, dni):
         '''restamos 1 a los ingresos del socio'''
         conn = self.conectar()
         if conn:
@@ -72,7 +72,27 @@ class Database:
                 print("El socio de prueba ya existe.")
             finally:
                 conn.close()
-
+    def registrar_socio(self, nombre, apellido, dni, actividad, ingresos):
+        '''guardar un nuevo socio en la base de datos'''
+        conn = self.conectar()
+        if conn:
+            try:
+                cursor = conn.cursor()
+                #la fecha de ultimo pago la ponemos como hoy automaticamente
+                cursor.execute('''
+                                INSERT INTO miembros (nombre, apellido, dni, actividad, ingresos_restantes, ultimo_pago)
+                                VALUES (?, ?,
+                                ?, ?, ?, DATE('now'))
+                               ''', (nombre, apellido, dni, actividad, ingresos))
+                conn.commit()
+                return True
+            except sqlite3.IntegrityError:
+                return False
+            except Exception as e:
+                print(f"Error al registrar: {e}")
+                return False
+            finally:
+                conn.close()
 
 if __name__ == "__main__":
     db = Database()
