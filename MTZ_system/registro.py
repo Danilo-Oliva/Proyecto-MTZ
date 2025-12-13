@@ -1,27 +1,48 @@
 import sys
 from PyQt6.QtWidgets import (
-    QApplication, QDialog, QFormLayout, QLineEdit, 
-    QComboBox, QSpinBox, QPushButton, QMessageBox, QLabel
+    QWidget, QFormLayout, QLineEdit,
+    QComboBox, QSpinBox, QPushButton, QMessageBox, QLabel,
+    QVBoxLayout, QAbstractSpinBox
 )
+from PyQt6.QtCore import Qt
 from database import Database
-from datetime import datetime
 
-# --- TU LÓGICA INTACTA ---
-class VentanaRegistro(QDialog):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Nuevo Socio - MTZ")
-        self.setFixedSize(400, 300)
+class VentanaRegistro(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
         self.db = Database()
         
-        layout = QFormLayout()
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(40, 40, 40, 40)
+        
+        # Título Interno
+        lbl_titulo = QLabel("Registrar Nuevo Socio")
+        lbl_titulo.setStyleSheet("font-size: 24px; font-weight: bold; color: #333; margin-bottom: 20px;")
+        main_layout.addWidget(lbl_titulo)
+
+        # Layout del Formulario
+        form_layout = QFormLayout()
+        form_layout.setSpacing(20)
+        
+        # Estilos adaptados para fondo blanco (Panel)
+        self.setStyleSheet("""
+            QWidget { background-color: transparent; }
+            QLabel { color: #333; font-size: 14px; font-weight: bold; }
+            QLineEdit, QComboBox, QSpinBox {
+                background-color: white; color: #333; border: 1px solid #ccc;
+                padding: 8px; border-radius: 4px; font-size: 14px; min-width: 300px;
+            }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
+                border: 2px solid #3498db;
+            }
+        """)
         
         self.input_nombre = QLineEdit()
         self.input_apellido = QLineEdit()
         self.input_dni = QLineEdit()
         self.input_dni.setPlaceholderText("Solo números")
         
-        # --- PLANES ---
         self.combo_actividad = QComboBox()
         planes = self.db.obtener_planes()
         if planes:
@@ -29,42 +50,47 @@ class VentanaRegistro(QDialog):
         else:
             self.combo_actividad.addItem("Sin planes cargados")
         
-        # Conectamos el cambio de plan a la función
         self.combo_actividad.currentTextChanged.connect(self.actualizar_pases)
 
-        # --- PASES (SPINBOX) ---
         self.spin_ingresos = QSpinBox()
-        self.spin_ingresos.setRange(0, 60) # Pongo 0 por si es ilimitado
-        self.spin_ingresos.setValue(30)    # Valor inicial (Libre)
+        self.spin_ingresos.setRange(0, 999)
+        self.spin_ingresos.setValue(30)
+        self.spin_ingresos.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         
-        self.btn_guardar = QPushButton("Registrar Socio")
-        self.btn_guardar.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-weight: bold;")
+        self.btn_guardar = QPushButton("GUARDAR FICHA")
+        self.btn_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_guardar.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60; color: white; padding: 12px;
+                font-weight: bold; border-radius: 5px; font-size: 14px; border: none; margin-top: 20px;
+            }
+            QPushButton:hover { background-color: #2ecc71; }
+        """)
         self.btn_guardar.clicked.connect(self.guardar_socio)
         
-        layout.addRow("Nombre: ", self.input_nombre)
-        layout.addRow("Apellido:", self.input_apellido)
-        layout.addRow("DNI:", self.input_dni)
-        layout.addRow("Planes:", self.combo_actividad)
-        layout.addRow("Pases Iniciales:", self.spin_ingresos)
-        layout.addRow(self.btn_guardar)
+        form_layout.addRow("Nombre:", self.input_nombre)
+        form_layout.addRow("Apellido:", self.input_apellido)
+        form_layout.addRow("DNI:", self.input_dni)
+        form_layout.addRow("Plan:", self.combo_actividad)
+        form_layout.addRow("Pases:", self.spin_ingresos)
+        form_layout.addRow("", self.btn_guardar)
         
-        self.setLayout(layout)
+        main_layout.addLayout(form_layout)
+        main_layout.addStretch()
+        self.setLayout(main_layout)
         
-        # Llamamos a la función una vez al inicio para configurar el primer valor
         self.actualizar_pases() 
 
     def actualizar_pases(self):
-        """Cambia el número de pases según el plan elegido"""
         plan = self.combo_actividad.currentText()
-        
-        if "Libre" in plan and "Pase Libre" not in plan: # Solo "Libre"
+        if "Libre" in plan and "Pase Libre" not in plan:
             self.spin_ingresos.setValue(30)
         elif "3 veces" in plan:
-            self.spin_ingresos.setValue(12) # 4 semanas * 3 veces = 12 clases
+            self.spin_ingresos.setValue(12)
         elif "Pase Libre" in plan:
              self.spin_ingresos.setValue(30)
         else:
-            self.spin_ingresos.setValue(12) # Por defecto para el resto
+            self.spin_ingresos.setValue(12)
 
     def guardar_socio(self):
         nombre = self.input_nombre.text().strip()
@@ -81,11 +107,9 @@ class VentanaRegistro(QDialog):
         
         if existe:
             if activo == 1:
-                # Caso A: El socio ya existe y está activo -> Error normal
                 QMessageBox.critical(self, "Error", "Ese DNI ya está registrado y activo.")
                 return
             else:
-                # Caso B: El socio existe pero estaba ELIMINADO -> Preguntar reactivación
                 respuesta = QMessageBox.question(
                     self, "Socio Encontrado",
                     f"El DNI {dni} pertenece a un socio inactivo.\n¿Deseas REACTIVARLO con este nuevo plan?",
@@ -96,7 +120,7 @@ class VentanaRegistro(QDialog):
                 if respuesta == QMessageBox.StandardButton.Yes:
                     if self.db.reactivar_socio(nombre, apellido, dni, plan_nombre, ingresos):
                         QMessageBox.information(self, "Reactivado", "¡Socio reactivado exitosamente!")
-                        self.accept()
+                        self.limpiar_formulario() 
                     else:
                         QMessageBox.critical(self, "Error", "No se pudo reactivar.")
                 return
@@ -105,13 +129,18 @@ class VentanaRegistro(QDialog):
         
         if exito:
             QMessageBox.information(self, "Éxito", f"Socio {nombre} {apellido} registrado correctamente.")
-            self.accept()
+            self.limpiar_formulario()
         else:
             QMessageBox.critical(self, "Error", "No se pudo registrar. ¿Quizás el DNI ya existe?")
 
-# Esto permite probar este archivo solo si quieres
+    def limpiar_formulario(self):
+        self.input_nombre.clear()
+        self.input_apellido.clear()
+        self.input_dni.clear()
+        self.actualizar_pases()
+
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = sys.modules.get('PyQt6.QtWidgets').QApplication(sys.argv)
     ventana = VentanaRegistro()
     ventana.show()
     sys.exit(app.exec())

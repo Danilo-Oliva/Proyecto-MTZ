@@ -1,10 +1,15 @@
 import sqlite3
 import os
-from datetime import datetime, timedelta  # <--- IMPORTANTE: Para sumar días
+import sys
+from datetime import datetime, timedelta
 
 class Database:
     def __init__(self, db_name="gym_mtz.db"):
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            
         self.db_path = os.path.join(base_dir, db_name)
 
     def conectar(self):
@@ -21,6 +26,7 @@ class Database:
         if conn:
             cursor = conn.cursor()
             
+            #tabla planes
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS planes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +35,7 @@ class Database:
                 )
             ''')
 
-            # CAMBIO: Agregamos fecha_vencimiento
+            #tabla miembros
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS miembros (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +80,6 @@ class Database:
             except sqlite3.IntegrityError:
                 pass 
 
-    # --- REGISTRO CON VENCIMIENTO (+30 DÍAS) ---
     def registrar_socio(self, nombre, apellido, dni, plan_nombre, ingresos):
         conn = self.conectar()
         if conn:
@@ -103,7 +108,6 @@ class Database:
                 conn.close()
         return False
 
-    # --- RENOVACIÓN CON VENCIMIENTO (+30 DÍAS Y RESETEO DE PASES) ---
     def renovar_socio(self, id_socio, plan_nombre, pases_a_sumar):
         conn = self.conectar()
         if conn:
@@ -113,7 +117,6 @@ class Database:
                 plan_result = cursor.fetchone()
                 plan_id = plan_result[0] if plan_result else None
 
-                # Calculamos nuevo vencimiento
                 hoy = datetime.now()
                 vencimiento = hoy + timedelta(days=30)
                 fecha_venc_str = vencimiento.strftime('%Y-%m-%d')
@@ -136,7 +139,6 @@ class Database:
                 conn.close()
         return False
 
-    # --- ACCESO ESTRICTO (FECHA + PASES) ---
     def registrar_ingreso(self, dni):
         conn = self.conectar()
         info_socio = None
@@ -145,7 +147,6 @@ class Database:
             try:
                 cursor = conn.cursor()
                 
-                # Ahora traemos también la fecha_vencimiento
                 cursor.execute('''
                     SELECT m.id, m.nombre, m.apellido, p.nombre, m.ingresos_restantes, m.fecha_vencimiento 
                     FROM miembros m
@@ -154,25 +155,23 @@ class Database:
                 ''', (dni,))
                 
                 resultado = cursor.fetchone()
+                ahora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 
                 if resultado:
                     m_id, nombre, apellido, plan, ingresos, fecha_venc = resultado
                     
-                    # Convertimos las fechas para comparar
                     hoy_str = datetime.now().strftime('%Y-%m-%d')
-                    
-                    # LÓGICA DE RECHAZO
-                    # 1. Si la fecha de hoy es MAYOR o IGUAL al vencimiento -> VENCIDO
-                    # 2. Si no tiene pases -> SIN SALDO
                     
                     es_vencido = False
                     if fecha_venc and hoy_str >= fecha_venc:
                         es_vencido = True
                     
                     if ingresos > 0 and not es_vencido:
-                        # --- ACCESO PERMITIDO ---
+                        
                         cursor.execute("UPDATE miembros SET ingresos_restantes = ingresos_restantes - 1 WHERE id = ?", (m_id,))
-                        cursor.execute("INSERT INTO historial_acceso (miembro_id, tipo_acceso) VALUES (?, 'Ingreso')", (m_id,))
+                        
+                        cursor.execute("INSERT INTO historial_acceso (miembro_id, fecha_hora, tipo_acceso) VALUES (?, ?, 'Ingreso')", (m_id, ahora))
+                        
                         conn.commit()
                         
                         info_socio = {
@@ -185,7 +184,6 @@ class Database:
                             "mensaje": "PASE HABILITADO"
                         }
                     else:
-                        # --- ACCESO DENEGADO (Determinar motivo) ---
                         motivo = "Rechazado"
                         mensaje_pantalla = "ACCESO DENEGADO"
                         
@@ -196,7 +194,7 @@ class Database:
                             motivo = "Sin Pases"
                             mensaje_pantalla = "⛔ SIN PASES"
 
-                        cursor.execute("INSERT INTO historial_acceso (miembro_id, tipo_acceso) VALUES (?, ?)", (m_id, motivo))
+                        cursor.execute("INSERT INTO historial_acceso (miembro_id, fecha_hora, tipo_acceso) VALUES (?, ?, ?)", (m_id, ahora, motivo))
                         conn.commit()
                         
                         info_socio = {
@@ -247,14 +245,13 @@ class Database:
             finally:
                 conn.close()
         return False
-    # --- AGREGA ESTO AL FINAL DE TU CLASE DATABASE ---
+    
     def eliminar_socio(self, id_socio):
         """Marca al socio como inactivo (Borrado lógico) para que no aparezca más"""
         conn = self.conectar()
         if conn:
             try:
                 cursor = conn.cursor()
-                # No borramos, solo apagamos el interruptor 'activo'
                 cursor.execute("UPDATE miembros SET activo = 0 WHERE id = ?", (id_socio,))
                 conn.commit()
                 return True
@@ -265,7 +262,6 @@ class Database:
                 conn.close()
         return False
     def verificar_dni_existente(self, dni):
-        """Devuelve (existe, activo) para saber qué hacer"""
         conn = self.conectar()
         if conn:
             cursor = conn.cursor()
@@ -284,17 +280,14 @@ class Database:
             try:
                 cursor = conn.cursor()
                 
-                # Buscamos el ID del plan
                 cursor.execute("SELECT id FROM planes WHERE nombre = ?", (plan_nombre,))
                 plan_result = cursor.fetchone()
                 plan_id = plan_result[0] if plan_result else None
 
-                # Calculamos vencimiento (30 días)
                 hoy = datetime.now()
                 vencimiento = hoy + timedelta(days=30)
                 fecha_venc_str = vencimiento.strftime('%Y-%m-%d')
 
-                # ACTUALIZAMOS TODO Y PONEMOS ACTIVO = 1
                 cursor.execute('''
                     UPDATE miembros 
                     SET nombre = ?, apellido = ?, plan_id = ?, 

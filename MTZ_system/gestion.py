@@ -1,6 +1,6 @@
 import sys
 from PyQt6.QtWidgets import (
-    QApplication, QDialog, QVBoxLayout, QLineEdit, QPushButton, 
+    QWidget, QDialog, QVBoxLayout, QLineEdit, QPushButton,
     QHBoxLayout, QTableWidget, QTableWidgetItem, 
     QHeaderView, QMessageBox, QLabel, QComboBox, 
     QSpinBox, QFormLayout, QAbstractSpinBox
@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from database import Database
 
+# --- LAS VENTANAS PEQUEÑAS SIGUEN SIENDO DIALOGOS (FLOTANTES) ---
 class VentanaEdicion(QDialog):
     def __init__(self, id_socio, nombre, apellido, dni, parent=None):
         super().__init__(parent)
@@ -16,7 +17,7 @@ class VentanaEdicion(QDialog):
         self.id_socio = id_socio
         self.db = Database()
 
-        # Estilo Oscuro
+        # Estilo Oscuro (Pop-up)
         self.setStyleSheet("""
             QDialog { background-color: #2b2b2b; color: white; }
             QLabel { color: white; font-weight: bold; font-size: 14px; }
@@ -63,14 +64,12 @@ class VentanaEdicion(QDialog):
             return
 
         exito = self.db.editar_socio(self.id_socio, nuevo_nombre, nuevo_apellido, nuevo_dni)
-        
         if exito:
             QMessageBox.information(self, "Éxito", "Datos actualizados correctamente.")
             self.accept()
         else:
             QMessageBox.critical(self, "Error", "No se pudo guardar.\n¿Quizás el DNI ya lo usa otro socio?")
 
-# --- NUEVA VENTANITA PARA COBRAR ---
 class VentanaRenovacion(QDialog):
     def __init__(self, id_socio, nombre_socio, parent=None):
         super().__init__(parent)
@@ -79,7 +78,7 @@ class VentanaRenovacion(QDialog):
         self.id_socio = id_socio
         self.db = Database()
 
-        # Estilo Oscuro (Coherente con el resto)
+        # Estilo Oscuro (Pop-up)
         self.setStyleSheet("""
             QDialog { background-color: #2b2b2b; color: white; }
             QLabel { color: white; font-weight: bold; font-size: 14px; }
@@ -95,18 +94,14 @@ class VentanaRenovacion(QDialog):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(15)
 
-        # Selector de Plan
         self.combo_plan = QComboBox()
-        planes = self.db.obtener_planes()
-        self.combo_plan.addItems(planes)
+        self.combo_plan.addItems(self.db.obtener_planes())
         self.combo_plan.currentTextChanged.connect(self.actualizar_pases)
 
-        # Cantidad de Pases
         self.spin_pases = QSpinBox()
         self.spin_pases.setRange(0, 999)
         self.spin_pases.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         
-        # Botón Confirmar
         btn_confirmar = QPushButton("CONFIRMAR PAGO")
         btn_confirmar.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_confirmar.setStyleSheet("""
@@ -123,7 +118,7 @@ class VentanaRenovacion(QDialog):
         layout.addRow("", btn_confirmar)
 
         self.setLayout(layout)
-        self.actualizar_pases() # Cargar valor inicial
+        self.actualizar_pases() 
 
     def actualizar_pases(self):
         plan = self.combo_plan.currentText()
@@ -139,47 +134,47 @@ class VentanaRenovacion(QDialog):
     def confirmar_renovacion(self):
         plan = self.combo_plan.currentText()
         pases = self.spin_pases.value()
-        
         exito = self.db.renovar_socio(self.id_socio, plan, pases)
         if exito:
             QMessageBox.information(self, "Pago Registrado", "La cuota se renovó correctamente.")
-            self.accept() # Cierra la ventana y devuelve "True"
+            self.accept()
         else:
             QMessageBox.critical(self, "Error", "No se pudo renovar la cuota.")
 
-# --- VENTANA PRINCIPAL DE GESTIÓN ---
-class VentanaGestion(QDialog):
+#TABLA PRINCIPAL
+class VentanaGestion(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Gestión de Socios - MTZ")
-        self.setFixedSize(900, 600) 
         
-        # Estilo General
+        # Estilos adaptados para fondo CLARO (Panel blanco)
         self.setStyleSheet("""
-            QDialog { background-color: #2b2b2b; color: white; }
+            QWidget { background-color: transparent; }
             QLineEdit {
-                background-color: #404040; color: white; border: 1px solid #666;
+                background-color: white; color: #333; border: 1px solid #ccc;
                 padding: 8px; border-radius: 4px; font-size: 14px;
             }
             QPushButton {
-                background-color: #3498db; color: white; padding: 10px;
-                border-radius: 4px; font-weight: bold; border: none;
+                padding: 8px 12px; border-radius: 4px; font-weight: bold; border: none;
             }
-            QPushButton:hover { background-color: #2980b9; }
             QTableWidget {
-                background-color: #333; color: white; gridline-color: #555;
-                border: none; font-size: 13px;
+                background-color: white; color: #333; gridline-color: #ccc;
+                border: 1px solid #ccc; font-size: 13px;
             }
             QHeaderView::section {
-                background-color: #222; color: white; padding: 5px; border: 1px solid #555;
+                background-color: #eee; color: #333; padding: 5px; border: 1px solid #ccc;
             }
-            QTableWidget::item:selected { background-color: #3498db; }
+            QTableWidget::item:selected { background-color: #3498db; color: white; }
         """)
 
         self.db = Database()
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
+        
+        # Título Interno
+        lbl_titulo = QLabel("Gestión de Socios")
+        lbl_titulo.setStyleSheet("font-size: 24px; font-weight: bold; color: #333;")
+        layout.addWidget(lbl_titulo)
 
         # Buscador
         layout_buscar = QHBoxLayout()
@@ -187,8 +182,10 @@ class VentanaGestion(QDialog):
         self.input_buscar.setPlaceholderText("Buscar por Nombre, Apellido o DNI...")
         self.input_buscar.textChanged.connect(self.cargar_socios)
         
-        btn_refrescar = QPushButton("🔄 Actualizar")
-        btn_refrescar.setFixedWidth(100)
+        btn_refrescar = QPushButton("🔄")
+        btn_refrescar.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_refrescar.setStyleSheet("background-color: #3498db; color: white;")
+        btn_refrescar.setFixedWidth(40)
         btn_refrescar.clicked.connect(self.cargar_socios)
 
         layout_buscar.addWidget(self.input_buscar)
@@ -201,24 +198,26 @@ class VentanaGestion(QDialog):
         self.tabla.setHorizontalHeaderLabels(["ID", "Nombre", "Apellido", "DNI", "Plan", "Pases"])
         self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tabla.setColumnHidden(0, True) 
-        self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows) # Seleccionar fila completa
-        self.tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)  # Solo una a la vez
+        self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         layout.addWidget(self.tabla)
 
         # Botones
         layout_botones = QHBoxLayout()
         
         btn_editar = QPushButton("✏️ Editar")
-        btn_editar.setStyleSheet("background-color: #f39c12;")
+        btn_editar.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_editar.setStyleSheet("background-color: #f39c12; color: white;")
         btn_editar.clicked.connect(self.accion_editar)
         
         btn_renovar = QPushButton("💰 Renovar Cuota")
-        btn_renovar.setStyleSheet("background-color: #27ae60;")
         btn_renovar.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_renovar.setStyleSheet("background-color: #27ae60; color: white;")
         btn_renovar.clicked.connect(self.accion_renovar)
         
         btn_borrar = QPushButton("🗑️ Eliminar") 
-        btn_borrar.setStyleSheet("background-color: #c0392b;")
+        btn_borrar.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_borrar.setStyleSheet("background-color: #c0392b; color: white;")
         btn_borrar.clicked.connect(self.accion_borrar)
 
         layout_botones.addWidget(btn_editar)
@@ -256,21 +255,17 @@ class VentanaGestion(QDialog):
             conn.close()
 
     def accion_renovar(self):
-        # 1. Verificar si hay algo seleccionado
-        fila_actual = self.tabla.currentRow()
-        if fila_actual == -1:
+        fila = self.tabla.currentRow()
+        if fila == -1:
             QMessageBox.warning(self, "Atención", "Por favor, selecciona un socio de la tabla.")
             return
 
-        # 2. Obtener datos de la fila seleccionada
-        id_socio = self.tabla.item(fila_actual, 0).text() # ID oculto
-        nombre = self.tabla.item(fila_actual, 1).text()
-        apellido = self.tabla.item(fila_actual, 2).text()
+        id_socio = self.tabla.item(fila, 0).text()
+        nombre = self.tabla.item(fila, 1).text()
+        apellido = self.tabla.item(fila, 2).text()
 
-        # 3. Abrir ventanita de cobro
+        # Dialogo FLOTANTE (se mantiene QDialog)
         dialogo = VentanaRenovacion(id_socio, f"{nombre} {apellido}", self)
-        
-        # 4. Si pagó (dialogo.exec() devuelve True), actualizamos la tabla
         if dialogo.exec():
             self.cargar_socios()
     
@@ -280,18 +275,16 @@ class VentanaGestion(QDialog):
             QMessageBox.warning(self, "Atención", "Selecciona un socio para editar.")
             return
 
-        # Obtenemos los datos actuales de la tabla para rellenar el formulario
         id_socio = self.tabla.item(fila, 0).text()
         nombre = self.tabla.item(fila, 1).text()
         apellido = self.tabla.item(fila, 2).text()
         dni = self.tabla.item(fila, 3).text()
 
-        # Abrimos la ventana de edición
+        # Dialogo FLOTANTE (se mantiene QDialog)
         dialogo = VentanaEdicion(id_socio, nombre, apellido, dni, self)
-        
-        # Si guardó cambios, refrescamos la tabla
         if dialogo.exec():
             self.cargar_socios()
+
     def accion_borrar(self):
         fila = self.tabla.currentRow()
         if fila == -1:
@@ -302,10 +295,9 @@ class VentanaGestion(QDialog):
         nombre = self.tabla.item(fila, 1).text()
         apellido = self.tabla.item(fila, 2).text()
 
-        # PREGUNTA DE SEGURIDAD
         confirmacion = QMessageBox.question(
             self, "Confirmar Eliminación",
-            f"¿Estás seguro de que deseas eliminar a {nombre} {apellido}?\nDesaparecerá de la lista pero no del historial.",
+            f"¿Estás seguro de que deseas eliminar a {nombre} {apellido}?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
@@ -313,12 +305,12 @@ class VentanaGestion(QDialog):
         if confirmacion == QMessageBox.StandardButton.Yes:
             if self.db.eliminar_socio(id_socio):
                 QMessageBox.information(self, "Eliminado", "El socio ha sido eliminado correctamente.")
-                self.cargar_socios() # Recargamos para que desaparezca
+                self.cargar_socios()
             else:
                 QMessageBox.critical(self, "Error", "No se pudo eliminar al socio.")
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = sys.modules.get('PyQt6.QtWidgets').QApplication(sys.argv)
     ventana = VentanaGestion()
     ventana.show()
     sys.exit(app.exec())

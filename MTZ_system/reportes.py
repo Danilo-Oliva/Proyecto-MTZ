@@ -108,7 +108,7 @@ class VentanaReportes(QDialog):
         total_al_dia = total_socios - total_vencidos
         
         # D. Estimación de Ingresos (Suma de precios de planes activos)
-        # Ojo: Esto asume que todos pagaron su plan actual. Es una estimación de "Caja Mensual Potencial".
+        # Esto asume que todos pagaron su plan actual. Es una estimación de "Caja Mensual Potencial".
         sql_ingresos = """
             SELECT SUM(p.precio) 
             FROM miembros m 
@@ -139,10 +139,9 @@ class VentanaReportes(QDialog):
         # Formateamos el dinero con puntos de mil
         txt_dinero = f"${ingresos_estimados:,.0f}".replace(",", ".")
         card_plata = TarjetaDato("Ingreso Mensual Est.", txt_dinero, "#f39c12")
-        card_plata.setFixedWidth(640) # Un poco más ancha para que destaque
+        card_plata.setFixedWidth(640)
         self.grid.addWidget(card_plata, 1, 0, 1, 3, Qt.AlignmentFlag.AlignCenter)
 
-# Para probarlo solo
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     ventana = VentanaReportes()
