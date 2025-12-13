@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from registro import VentanaRegistro 
 from gestion import VentanaGestion
+from reportes import VentanaReportes
 
 class PanelAdmin(QMainWindow):
     def __init__(self):
@@ -27,17 +28,9 @@ class PanelAdmin(QMainWindow):
         titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_menu.addWidget(titulo)
         
-        # --- BOTÓN: NUEVO SOCIO ---
+        # BOTONES
         btn_nuevo = QPushButton(" + Nuevo Socio")
-        # Estilo simple para el menú
-        btn_nuevo.setStyleSheet("""
-            QPushButton { 
-                background-color: transparent; color: #bdc3c7; padding: 10px; 
-                border: none; font-size: 16px; text-align: left; padding-left: 20px; 
-            }
-            QPushButton:hover { background-color: #34495e; color: white; }
-        """)
-        # Aquí conectamos con tu ventana de registro
+        btn_nuevo.setStyleSheet(self.estilo_boton())
         btn_nuevo.clicked.connect(self.abrir_registro) 
         layout_menu.addWidget(btn_nuevo)
         
@@ -45,6 +38,11 @@ class PanelAdmin(QMainWindow):
         btn_gestion.setStyleSheet(self.estilo_boton())
         btn_gestion.clicked.connect(self.abrir_gestion)
         layout_menu.addWidget(btn_gestion)
+        
+        btn_reportes = QPushButton("📊 Reportes")
+        btn_reportes.setStyleSheet(self.estilo_boton())
+        btn_reportes.clicked.connect(self.abrir_reportes)
+        layout_menu.addWidget(btn_reportes)
 
         layout_menu.addStretch()
         barra_lateral.setLayout(layout_menu)
@@ -76,12 +74,15 @@ class PanelAdmin(QMainWindow):
             QPushButton:hover { background-color: #34495e; color: white; }
         """
     def abrir_registro(self):
-        # Creamos la instancia de TU clase que está en registro.py
         dialogo = VentanaRegistro()
         dialogo.exec()
         
     def abrir_gestion(self):
         dialogo = VentanaGestion()
+        dialogo.exec()
+        
+    def abrir_reportes(self):
+        dialogo = VentanaReportes()
         dialogo.exec()
 
 if __name__ == "__main__":
