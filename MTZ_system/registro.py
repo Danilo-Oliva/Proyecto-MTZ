@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QSpinBox, QPushButton, QMessageBox, QLabel
 )
 from database import Database
+from datetime import datetime
 
 # --- TU LÓGICA INTACTA ---
 class VentanaRegistro(QDialog):
@@ -75,6 +76,30 @@ class VentanaRegistro(QDialog):
         if not nombre or not apellido or not dni:
             QMessageBox.warning(self, "Error", "Por favor complete todos los campos.")
             return
+        
+        existe, activo = self.db.verificar_dni_existente(dni)
+        
+        if existe:
+            if activo == 1:
+                # Caso A: El socio ya existe y está activo -> Error normal
+                QMessageBox.critical(self, "Error", "Ese DNI ya está registrado y activo.")
+                return
+            else:
+                # Caso B: El socio existe pero estaba ELIMINADO -> Preguntar reactivación
+                respuesta = QMessageBox.question(
+                    self, "Socio Encontrado",
+                    f"El DNI {dni} pertenece a un socio inactivo.\n¿Deseas REACTIVARLO con este nuevo plan?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                )
+                
+                if respuesta == QMessageBox.StandardButton.Yes:
+                    if self.db.reactivar_socio(nombre, apellido, dni, plan_nombre, ingresos):
+                        QMessageBox.information(self, "Reactivado", "¡Socio reactivado exitosamente!")
+                        self.accept()
+                    else:
+                        QMessageBox.critical(self, "Error", "No se pudo reactivar.")
+                return
         
         exito = self.db.registrar_socio(nombre, apellido, dni, plan_nombre, ingresos)
         

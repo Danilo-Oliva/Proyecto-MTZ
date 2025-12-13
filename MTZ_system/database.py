@@ -150,7 +150,7 @@ class Database:
                     SELECT m.id, m.nombre, m.apellido, p.nombre, m.ingresos_restantes, m.fecha_vencimiento 
                     FROM miembros m
                     LEFT JOIN planes p ON m.plan_id = p.id
-                    WHERE m.dni = ?
+                    WHERE m.dni = ? AND m.activo = 1
                 ''', (dni,))
                 
                 resultado = cursor.fetchone()
@@ -224,3 +224,90 @@ class Database:
             planes = [row[0] for row in cursor.fetchall()]
             conn.close()
         return planes
+    def editar_socio(self, id_socio, nombre, apellido, dni):
+        """Modifica los datos personales de un socio existente"""
+        conn = self.conectar()
+        if conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE miembros 
+                    SET nombre = ?, apellido = ?, dni = ?
+                    WHERE id = ?
+                ''', (nombre, apellido, dni, id_socio))
+                
+                conn.commit()
+                return True
+            except sqlite3.IntegrityError:
+                print("Error: El DNI ya existe en otro socio.")
+                return False
+            except Exception as e:
+                print(f"Error al editar: {e}")
+                return False
+            finally:
+                conn.close()
+        return False
+    # --- AGREGA ESTO AL FINAL DE TU CLASE DATABASE ---
+    def eliminar_socio(self, id_socio):
+        """Marca al socio como inactivo (Borrado lógico) para que no aparezca más"""
+        conn = self.conectar()
+        if conn:
+            try:
+                cursor = conn.cursor()
+                # No borramos, solo apagamos el interruptor 'activo'
+                cursor.execute("UPDATE miembros SET activo = 0 WHERE id = ?", (id_socio,))
+                conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error al eliminar: {e}")
+                return False
+            finally:
+                conn.close()
+        return False
+    def verificar_dni_existente(self, dni):
+        """Devuelve (existe, activo) para saber qué hacer"""
+        conn = self.conectar()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT activo FROM miembros WHERE dni = ?", (dni,))
+            resultado = cursor.fetchone()
+            conn.close()
+            if resultado:
+                return True, resultado[0] # (Existe: Sí, Activo: 0 o 1)
+            return False, False # (Existe: No)
+        return False, False
+
+    def reactivar_socio(self, nombre, apellido, dni, plan_nombre, ingresos):
+        """Revive a un socio inactivo actualizando sus datos"""
+        conn = self.conectar()
+        if conn:
+            try:
+                cursor = conn.cursor()
+                
+                # Buscamos el ID del plan
+                cursor.execute("SELECT id FROM planes WHERE nombre = ?", (plan_nombre,))
+                plan_result = cursor.fetchone()
+                plan_id = plan_result[0] if plan_result else None
+
+                # Calculamos vencimiento (30 días)
+                hoy = datetime.now()
+                vencimiento = hoy + timedelta(days=30)
+                fecha_venc_str = vencimiento.strftime('%Y-%m-%d')
+
+                # ACTUALIZAMOS TODO Y PONEMOS ACTIVO = 1
+                cursor.execute('''
+                    UPDATE miembros 
+                    SET nombre = ?, apellido = ?, plan_id = ?, 
+                        ingresos_restantes = ?, ultimo_pago = DATE('now'),
+                        fecha_vencimiento = ?, activo = 1
+                    WHERE dni = ?
+                ''', (nombre, apellido, plan_id, ingresos, fecha_venc_str, dni))
+                
+                conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error al reactivar: {e}")
+                return False
+            finally:
+                conn.close()
+        return False
