@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from datetime import datetime, timedelta  # <--- IMPORTANTE: Para sumar días
 
 class Database:
     def __init__(self, db_name="gym_mtz.db"):
@@ -9,7 +10,6 @@ class Database:
     def conectar(self):
         try:
             conn = sqlite3.connect(self.db_path)
-            # Modo WAL para evitar bloqueos (database locked)
             conn.execute("PRAGMA journal_mode=WAL;")
             return conn
         except sqlite3.Error as e:
@@ -21,7 +21,6 @@ class Database:
         if conn:
             cursor = conn.cursor()
             
-            # 1. Tabla PLANES
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS planes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,8 +28,8 @@ class Database:
                     precio REAL NOT NULL
                 )
             ''')
-            
-            # 2. Tabla MIEMBROS
+
+            # CAMBIO: Agregamos fecha_vencimiento
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS miembros (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,19 +39,19 @@ class Database:
                     plan_id INTEGER,
                     ingresos_restantes INTEGER DEFAULT 0,
                     ultimo_pago DATE,
+                    fecha_vencimiento DATE,  -- <--- NUEVO CAMPO
                     fecha_registro DATE DEFAULT CURRENT_DATE,
                     activo BOOLEAN DEFAULT 1,
                     FOREIGN KEY(plan_id) REFERENCES planes(id)
                 )
             ''')
-            
-            # 3. Tabla HISTORIAL
+
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS historial_acceso (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     miembro_id INTEGER,
                     fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    tipo_acceso TEXT, 
+                    tipo_acceso TEXT,
                     FOREIGN KEY(miembro_id) REFERENCES miembros(id)
                 )
             ''')
@@ -60,10 +59,8 @@ class Database:
             self.inicializar_planes(cursor)
             conn.commit()
             conn.close()
-            print("Base de datos verificada con éxito.")
 
     def inicializar_planes(self, cursor):
-        """Carga los precios base si no existen"""
         planes_base = [
             ("Libre", 38000),
             ("3 veces x semana", 35000),
@@ -77,6 +74,7 @@ class Database:
             except sqlite3.IntegrityError:
                 pass 
 
+    # --- REGISTRO CON VENCIMIENTO (+30 DÍAS) ---
     def registrar_socio(self, nombre, apellido, dni, plan_nombre, ingresos):
         conn = self.conectar()
         if conn:
@@ -85,11 +83,17 @@ class Database:
                 cursor.execute("SELECT id FROM planes WHERE nombre = ?", (plan_nombre,))
                 plan_result = cursor.fetchone()
                 plan_id = plan_result[0] if plan_result else None
-                
+
+                # Calculamos vencimiento: Hoy + 30 días
+                hoy = datetime.now()
+                vencimiento = hoy + timedelta(days=30)
+                fecha_venc_str = vencimiento.strftime('%Y-%m-%d')
+
                 cursor.execute('''
-                    INSERT INTO miembros (nombre, apellido, dni, plan_id, ingresos_restantes, ultimo_pago)
-                    VALUES (?, ?, ?, ?, ?, DATE('now'))
-                ''', (nombre, apellido, dni, plan_id, ingresos))
+                    INSERT INTO miembros (nombre, apellido, dni, plan_id, ingresos_restantes, ultimo_pago, fecha_vencimiento)
+                    VALUES (?, ?, ?, ?, ?, DATE('now'), ?)
+                ''', (nombre, apellido, dni, plan_id, ingresos, fecha_venc_str))
+                
                 conn.commit()
                 return True
             except Exception as e:
@@ -99,6 +103,40 @@ class Database:
                 conn.close()
         return False
 
+    # --- RENOVACIÓN CON VENCIMIENTO (+30 DÍAS Y RESETEO DE PASES) ---
+    def renovar_socio(self, id_socio, plan_nombre, pases_a_sumar):
+        conn = self.conectar()
+        if conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM planes WHERE nombre = ?", (plan_nombre,))
+                plan_result = cursor.fetchone()
+                plan_id = plan_result[0] if plan_result else None
+
+                # Calculamos nuevo vencimiento
+                hoy = datetime.now()
+                vencimiento = hoy + timedelta(days=30)
+                fecha_venc_str = vencimiento.strftime('%Y-%m-%d')
+
+                cursor.execute('''
+                    UPDATE miembros 
+                    SET plan_id = ?, 
+                        ingresos_restantes = ?, 
+                        ultimo_pago = DATE('now'),
+                        fecha_vencimiento = ?
+                    WHERE id = ?
+                ''', (plan_id, pases_a_sumar, fecha_venc_str, id_socio))
+                
+                conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error al renovar: {e}")
+                return False
+            finally:
+                conn.close()
+        return False
+
+    # --- ACCESO ESTRICTO (FECHA + PASES) ---
     def registrar_ingreso(self, dni):
         conn = self.conectar()
         info_socio = None
@@ -107,9 +145,9 @@ class Database:
             try:
                 cursor = conn.cursor()
                 
-                # CORRECCIÓN IMPORTANTE: Ahora el SELECT trae los 6 datos que necesitamos
+                # Ahora traemos también la fecha_vencimiento
                 cursor.execute('''
-                    SELECT m.id, m.nombre, m.apellido, p.nombre, m.ingresos_restantes, m.ultimo_pago 
+                    SELECT m.id, m.nombre, m.apellido, p.nombre, m.ingresos_restantes, m.fecha_vencimiento 
                     FROM miembros m
                     LEFT JOIN planes p ON m.plan_id = p.id
                     WHERE m.dni = ?
@@ -118,27 +156,57 @@ class Database:
                 resultado = cursor.fetchone()
                 
                 if resultado:
-                    # Ahora sí coinciden las variables con las columnas
-                    m_id, nombre, apellido, plan, ingresos, ultimo_pago = resultado
+                    m_id, nombre, apellido, plan, ingresos, fecha_venc = resultado
                     
-                    if ingresos > 0:
+                    # Convertimos las fechas para comparar
+                    hoy_str = datetime.now().strftime('%Y-%m-%d')
+                    
+                    # LÓGICA DE RECHAZO
+                    # 1. Si la fecha de hoy es MAYOR o IGUAL al vencimiento -> VENCIDO
+                    # 2. Si no tiene pases -> SIN SALDO
+                    
+                    es_vencido = False
+                    if fecha_venc and hoy_str >= fecha_venc:
+                        es_vencido = True
+                    
+                    if ingresos > 0 and not es_vencido:
+                        # --- ACCESO PERMITIDO ---
                         cursor.execute("UPDATE miembros SET ingresos_restantes = ingresos_restantes - 1 WHERE id = ?", (m_id,))
                         cursor.execute("INSERT INTO historial_acceso (miembro_id, tipo_acceso) VALUES (?, 'Ingreso')", (m_id,))
-                        
                         conn.commit()
+                        
                         info_socio = {
-                            "nombre": nombre, "apellido": apellido, "plan": plan,
-                            "ultimo_pago": ultimo_pago, "ingresos_restantes": ingresos - 1,
-                            "acceso": True
+                            "nombre": nombre, 
+                            "apellido": apellido, 
+                            "plan": plan,
+                            "vencimiento": fecha_venc,
+                            "ingresos_restantes": ingresos - 1,
+                            "acceso": True,
+                            "mensaje": "PASE HABILITADO"
                         }
                     else:
-                        cursor.execute("INSERT INTO historial_acceso (miembro_id, tipo_acceso) VALUES (?, 'Rechazado')", (m_id,))
+                        # --- ACCESO DENEGADO (Determinar motivo) ---
+                        motivo = "Rechazado"
+                        mensaje_pantalla = "ACCESO DENEGADO"
+                        
+                        if es_vencido:
+                            motivo = "Vencido"
+                            mensaje_pantalla = "⛔ CUOTA VENCIDA"
+                        elif ingresos <= 0:
+                            motivo = "Sin Pases"
+                            mensaje_pantalla = "⛔ SIN PASES"
+
+                        cursor.execute("INSERT INTO historial_acceso (miembro_id, tipo_acceso) VALUES (?, ?)", (m_id, motivo))
                         conn.commit()
                         
                         info_socio = {
-                            "nombre": nombre, "apellido": apellido, "plan": plan,
-                            "ultimo_pago": ultimo_pago, "ingresos_restantes": 0,
-                            "acceso": False
+                            "nombre": nombre, 
+                            "apellido": apellido, 
+                            "plan": plan,
+                            "vencimiento": fecha_venc,
+                            "ingresos_restantes": ingresos,
+                            "acceso": False,
+                            "mensaje": mensaje_pantalla
                         }
             except Exception as e:
                 print(f"Error en ingreso: {e}")
@@ -156,7 +224,3 @@ class Database:
             planes = [row[0] for row in cursor.fetchall()]
             conn.close()
         return planes
-
-if __name__ == "__main__":
-    db = Database()
-    db.crear_tablas()
