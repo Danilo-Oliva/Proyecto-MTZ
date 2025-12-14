@@ -51,7 +51,8 @@ class Database:
                     FOREIGN KEY(plan_id) REFERENCES planes(id)
                 )
             ''')
-
+            
+            #tabla historial
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS historial_acceso (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,

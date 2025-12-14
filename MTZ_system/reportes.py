@@ -136,7 +136,6 @@ class VentanaReportes(QDialog):
         self.grid.addWidget(card_vencidos, 0, 2)
         
         # Tarjeta 4: Caja Estimada (Dorado) - Ocupa todo el ancho abajo
-        # Formateamos el dinero con puntos de mil
         txt_dinero = f"${ingresos_estimados:,.0f}".replace(",", ".")
         card_plata = TarjetaDato("Ingreso Mensual Est.", txt_dinero, "#f39c12")
         card_plata.setFixedWidth(640)

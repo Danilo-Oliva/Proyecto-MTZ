@@ -16,7 +16,7 @@ from registro import VentanaRegistro
 from gestion import VentanaGestion
 from reportes import VentanaReportes
 from monitor import VentanaPrincipal as VentanaMonitor
-from herramientas import VentanaHerramientas  # <--- NUEVO IMPORT
+from herramientas import VentanaHerramientas
 from database import Database
 from datetime import datetime
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
@@ -234,7 +234,7 @@ class PanelAdmin(QMainWindow):
             btn_herramientas,
         ]
         for btn in lista_botones:
-            if btn != btn_monitor:  # El monitor tiene su propio estilo
+            if btn != btn_monitor:
                 btn.setStyleSheet(self.estilo_boton())
             layout_menu.addWidget(btn)
 

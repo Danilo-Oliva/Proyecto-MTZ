@@ -31,14 +31,14 @@ class VentanaHerramientas(QDialog):
 
         # --- SECCIÓN 1: EXPORTAR ---
         btn_csv = QPushButton("  📄 Descargar Lista de Socios (.csv)")
-        btn_csv.setStyleSheet(self.estilo_boton("#3498db")) # Azul
+        btn_csv.setStyleSheet(self.estilo_boton("#3498db"))
         btn_csv.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_csv.clicked.connect(self.exportar_socios)
         layout.addWidget(btn_csv)
 
         # --- SECCIÓN 2: BACKUP ---
         btn_backup = QPushButton("  💾 Crear Respaldo de Base de Datos")
-        btn_backup.setStyleSheet(self.estilo_boton("#27ae60")) # Verde
+        btn_backup.setStyleSheet(self.estilo_boton("#27ae60"))
         btn_backup.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_backup.clicked.connect(self.crear_backup)
         layout.addWidget(btn_backup)

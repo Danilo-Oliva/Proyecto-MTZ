@@ -31,7 +31,6 @@ class VentanaPrincipal(QMainWindow):
 
         # --- 3. LA TARJETA BLANCA (MÁS COMPACTA) ---
         self.card = QFrame()
-        # CAMBIO: Reducimos tamaño para quitar espacio blanco sobrante
         self.card.setFixedSize(550, 350) 
         self.card.setStyleSheet("""
             QFrame {
@@ -42,9 +41,8 @@ class VentanaPrincipal(QMainWindow):
         """)
         
         self.layout_card = QVBoxLayout()
-        # CAMBIO: Menos margen interno
         self.layout_card.setContentsMargins(30, 30, 30, 30)
-        self.layout_card.setSpacing(5) # Menos espacio entre elementos
+        self.layout_card.setSpacing(5) 
         self.card.setLayout(self.layout_card)
         
         self.layout_principal.addWidget(self.card)
@@ -90,7 +88,7 @@ class VentanaPrincipal(QMainWindow):
             print(f"AVISO: No se encontró fondo en {base_path}")
 
     def crear_elementos_ui(self):
-        # RELOJ (Un poco más chico)
+        # RELOJ
         self.lbl_reloj = QLabel("00:00")
         self.lbl_reloj.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_reloj.setStyleSheet("color: #333; font-size: 42px; font-weight: 300; background: transparent; border: none;")
@@ -187,7 +185,6 @@ class VentanaPrincipal(QMainWindow):
         
         venc = datetime.strptime(info['vencimiento'], '%Y-%m-%d').strftime('%d/%m/%Y') if info['vencimiento'] else "--/--/--"
         
-        # CAMBIO: Ajustamos tamaños de fuente y márgenes para que quepan bien
         texto_html = f"""
             <h1 style='font-size: 50px; margin:0;'>{icono}</h1>
             <h2 style='font-size: 28px; color: #333; margin:5px;'>{info['nombre']} {info['apellido']}</h2>
