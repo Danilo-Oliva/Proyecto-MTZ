@@ -102,7 +102,7 @@ class VentanaPrincipal(QMainWindow):
         self.actualizar_reloj()
         
         # TITULO
-        self.lbl_titulo = QLabel("Bienvenido al MTZ")
+        self.lbl_titulo = QLabel("Bienvenido a MTZ")
         self.lbl_titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_titulo.setStyleSheet("color: #000; font-size: 32px; font-weight: bold; background: transparent; border: none; margin-bottom: 10px;")
         self.layout_card.addWidget(self.lbl_titulo)
